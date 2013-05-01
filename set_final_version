@@ -1,0 +1,561 @@
+#include<cstdlib>
+#include<iostream>
+#include<string>
+
+#define BOOST_TEST_MODULE Set
+#define BOOST_TEST_MAIN
+#include <boost\test\unit_test.hpp>
+
+class node
+{
+public:
+  node* prev;
+	node* left;
+	node* right;
+	int val;
+	node(int x)
+	{
+		prev=left=right=nullptr;
+		val = x;
+	}
+	node()
+	{
+		prev=left=right=nullptr;
+		val = 0;
+	}
+	node(node* n)
+	{
+		prev=n;
+		left=right=nullptr;
+		val = 0;
+	}
+
+	node(node* n, int x)
+	{
+		prev=n;
+		left=right=nullptr;
+		val = x;
+	}
+};
+
+
+class iterator 
+{
+public:
+	
+	iterator (node *x)
+	{
+		n = x;
+	}
+	
+	iterator()
+	{}
+
+	iterator& operator++()   // префиксный
+	{
+		if(n->prev == nullptr)
+		{
+			n = n->left;
+			return *this;
+		}
+		if(n->right != nullptr)
+		{
+			n = n->right;
+			while(n->left != nullptr)
+				n = n->left;
+		}
+		else
+		{
+			while(n != (n->prev)->left)  // пока мы правый сын
+			{
+				n = n->prev;
+			}
+			n = n->prev;
+		}
+		return *this;
+	}
+
+	iterator operator++(int)
+	{
+		iterator it(n);
+		++(*this);
+		return it;
+	}
+
+	iterator& operator--()     // префиксный
+	{
+		if(n->prev == nullptr)
+		{
+			n = n->left;
+			while(n->right != nullptr)
+				n = n->right;
+			return *this;
+		}
+
+		if(n->prev->left == n->prev->right) // если мы в корне
+		{
+			// или ничего не делать,
+			// или начать с конца
+			return *this;
+		}
+
+		if(n->left != nullptr)   // есть левое поддерево
+		{
+			n = n->left;
+			while(n->right != nullptr)
+				n = n->right;
+			return *this;
+		}
+		else
+		{
+			while(n->prev!= nullptr &&  n != (n->prev)->right)  // пока мы левый сын
+			{
+				n = n->prev;
+			}
+			if(n->prev == nullptr)
+				return *this;
+			else
+				n = n->prev;
+			return *this;
+		}
+	}
+
+	iterator operator--(int)
+	{
+		iterator it(n);
+		--(*this);
+		return it;
+	}
+
+	int& operator*() const
+	{
+		return n->val;
+	}
+
+	bool isNull()
+	{
+		// нигде не используется, но пусть будет
+		if(n == nullptr)
+			return true;
+		else return false;
+	}
+
+	bool operator==(iterator const& it) const
+	{
+		if(n->val == it.n->val) return true;
+		else return false;
+	}
+
+	bool operator!=(iterator const& it) const
+	{
+		if(n->val == it.n->val) return false;
+		else return true;
+	}
+	
+	node* getnode()
+	{
+		// нужна для erase. нарушает инкапсуляцию, но что делать..
+		return n;
+	}
+
+private:
+	node* n;
+};
+
+class set
+{
+	private:
+		node* root;   // корень
+		int size;
+
+	private:
+		node* prefixTravelR(node* n)
+		{
+			node* t = new node(n->prev, n->val);
+			t->left = prefixTravelR(n->left);
+			t->right = prefixTravelR(n->right);
+			//delete n;
+			return t;
+		}
+
+		void prefixTravelD(node* n)
+		{
+			if(!n->left && !n->right)
+			{
+				delete n;
+				return;
+			}
+			if(n->left)
+				prefixTravelD(n->left);
+			if(n->right)
+				prefixTravelD(n->right);
+			delete n;
+			return;
+		}
+
+		node* prefixTravelC(node* n)
+		{
+			if(n == nullptr)
+				return nullptr;
+			node* t = new node(n->prev, n->val);
+			t->left = prefixTravelC(n->left);
+			t->right = prefixTravelC(n->right);
+			return t;
+		}
+
+		node* finder(int x, node* n = nullptr)
+		{
+			if(n == nullptr)
+				return n;
+
+			if(x == n->val)
+				return n;
+
+			if(n->left == nullptr && n->right == nullptr)
+				return n = nullptr;
+			
+			if(x < n->val)
+				return finder(x, n->left);
+			else
+				return finder(x, n->right);
+		}
+
+		node* minimum(node* n)
+		{
+			while(n->left != nullptr)
+				n = n->left;
+			return n;
+		}
+
+		node* maximum(node* n)
+		{
+			while(n->right != nullptr)
+				n = n->right;
+			return n;
+		}
+
+		node* next(int x, node* n)
+		{
+			if(n == nullptr) 
+				return n;
+			if(n->val == x)
+				return minimum(n->right);
+			if(n->val < x)
+			{	
+				if(n->right == nullptr)
+					return n;
+				else
+					return next(x, n->right);
+			}
+			else
+			{	
+				if(n->left == nullptr)
+					return n;
+				else
+					return next(x, n->left);
+			}
+		}
+
+		node* prev(int x, node* n)
+		{
+			if(n == nullptr)
+				return n;
+			if(n->val == x)
+				return maximum(n->left);
+			if(n->val > x)
+			{	if(n->left == nullptr)
+					return n;
+				else 
+					return prev(x, n->left);
+			}
+			else 
+			{
+				if(n->right == nullptr)
+					return n;
+				else
+					return prev(x, n->right);
+			}
+		}
+
+	public:
+		set()
+		{
+			// вроде норм
+			size=0;
+			root = new node();  // мы их еще раз выделяем или как?
+			root->prev = nullptr;
+		}
+
+		set(set const & newSet)
+		{
+			root = prefixTravelC(newSet.root);
+			size = newSet.size;
+		}
+
+		set & operator=(set const & newSet)
+		{
+			root = prefixTravelR(newSet.root);
+		}	
+
+		~set()
+		{
+			prefixTravelD(root);
+		}
+
+		bool insert(int x, node* n = nullptr)
+		{
+			// вроде норм
+			if (size == 0)
+			{
+				node* _node = new node(root, x);
+				root->left  = _node;
+				++size;
+				return true;
+			}
+
+			node * p = finder(x, root->left);
+			if(p != nullptr)
+			{
+				p = nullptr;
+				return false;
+			}
+			delete p;
+
+			if(n == nullptr)
+				n = root->left;
+			if(x > n->val)
+			{
+				if(n->right != nullptr)
+					insert(x, n->right);
+				else
+				{
+					node* t = new node(n, x);
+					++size;
+					//t->val = x;
+					//t->prev = n;
+					n->right = t;
+				}
+			}
+			else
+			{
+				if(n->left != nullptr)
+					insert(x, n->left);
+				else
+				{
+					node* t = new node(n,x);
+					++size;
+					//t->val = x;
+					//t->prev = n;
+					n->left = t;
+				}
+			}
+			return true;
+		}
+
+		iterator find(int x)
+		{
+			node * t = finder(x, root->left);
+			if(t == nullptr) 
+				return iterator(root);
+			else 
+				return iterator(t);
+		}
+
+		bool erase(iterator it)     
+		{
+			node *t = it.getnode();				
+			if(t == nullptr)
+				return false;
+
+			--size;
+			node *x = new node();    // не забыть обе удалить!
+			node *y = new node();
+			if(t->left != nullptr && t->right != nullptr)     
+			{
+				y = next(t->val, t);                   
+				x = nullptr;
+				if(y == y->prev->left)
+				{
+					t->val = y->val;
+					y->prev->left = nullptr;
+					delete y;
+				}
+				else
+				{
+					t->val = y->val;
+					y->prev->right = nullptr;
+					delete y;
+				}
+				delete x;    // он же null??
+				return true;
+			}
+			else if(t->left != nullptr || t->right != nullptr)  
+			{
+				y = t;
+				if(y->left != nullptr)
+					x = (y->left);
+				else 
+					x = (y->right);
+			}
+			else
+			{
+				y = t;
+				x = nullptr;
+			}
+
+			if(x != nullptr)
+			{
+				(x->prev) = (y->prev);
+			}
+
+			if(y->prev == root)    
+			{
+				root->left = x;        
+			}
+			else
+			{
+				if(y == y->prev->left)
+					y->prev->left = x;
+				else
+					y->prev->right = x;
+			}
+		}
+			
+		iterator end()
+		{
+			return iterator(root);
+		}
+
+		iterator begin()
+		{
+			return iterator(root->left);
+		}
+};
+
+
+////ручной тест сета
+//int main()
+//{
+//	//std::ifstream cin("bstsimple.in");
+//	//std::ofstream cout("bstsimple.out");
+//
+//	set s;
+//	int t;
+//	std::string str;
+//
+//	std::cout<<"Insert, Find, Remove"<<std::endl;
+//
+//	while(std::cin>>str)
+//	{
+//		if(str == "exit")
+//			return 0;
+//		if(str == "I")
+//		{
+//			std::cin>>t;
+//			s.insert(t);
+//			std::cout<<"done I "<<t<<std::endl;
+//		}
+//		else if(str == "F")
+//		{
+//			std::cin>>t;
+//			if(*s.find(t) == 1<<31)
+//				std::cout<<"none"<<std::endl;
+//			else std::cout<<*(s.find(t))<<std::endl;
+//		}
+//		else if(str == "R")
+//		{
+//			std::cin>>t;
+//			iterator it(s.find(t));
+//			s.erase(it);
+//			std::cout<<"done R "<<t<<std::endl;
+//		}
+//	}
+//	return 0;
+//}
+
+
+
+BOOST_AUTO_TEST_CASE(insert_find)
+{
+	set s;
+	s.insert(1);
+	BOOST_CHECK_EQUAL(*s.find(1), 1);
+}
+
+BOOST_AUTO_TEST_CASE(insert_erase_find)
+{
+	set s;
+	s.insert(1);
+	BOOST_CHECK_EQUAL(*s.find(1), 1);
+	s.erase(s.find(1));
+	BOOST_CHECK_EQUAL(s.find(1) == s.end(), true);
+}
+
+BOOST_AUTO_TEST_CASE(set_constructors)
+{
+	set s;
+	for(int i=0; i<10; ++i)
+		s.insert(i);
+	set s2(s);
+	iterator it = s2.find(0);
+
+	for(int i=0; i<10; ++i)
+	{
+		BOOST_CHECK_EQUAL(*it, i);
+		++it;
+	}
+
+	set s3 = s;
+	it = s3.find(0);
+	for(int i=0; i<10; ++i)
+	{
+		BOOST_CHECK_EQUAL(*it, i);
+		++it;
+	}
+}
+
+BOOST_AUTO_TEST_CASE(iterator_inc_dec)
+{
+	set s;
+	for(int i=0; i<10; ++i)
+		s.insert(i);
+
+	//s.insert(1);
+	iterator it = s.find(1);
+	for(int i=0; i<10; ++i)
+	{
+		BOOST_CHECK_EQUAL(*it, i);
+			++it;
+	}
+
+	BOOST_CHECK_EQUAL(it == s.end(), true);
+	// удивительно, но BOOST_CHECK_EQUAL(it, s.end()); даже не компилится
+
+	++it;
+
+	for(int i=0; i<10; ++i)
+	{
+		BOOST_CHECK_EQUAL(*it, i);
+			it++;
+	}
+
+	BOOST_CHECK_EQUAL(it == s.end(), true);
+
+	--it;
+
+	for(int i=9; i>=0; --i)
+	{
+		BOOST_CHECK_EQUAL(*it, i);
+			--it;
+	}
+
+	BOOST_CHECK_EQUAL(it == s.end(), true);
+
+	it--;
+
+	for(int i=9; i>=0; --i)
+	{
+		BOOST_CHECK_EQUAL(*it, i);
+			it--;
+	}
+}
